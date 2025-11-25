@@ -5,7 +5,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-
+    <!-- Steps -->
     <TextView
         android:id="@+id/stepsText"
         android:layout_width="wrap_content"
@@ -17,17 +17,49 @@
         android:layout_marginTop="40dp"
         android:layout_marginStart="40dp"/>
 
+    <!-- Calories -->
     <TextView
         android:id="@+id/caloriesText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Calories Burned: 0"
         android:textSize="20sp"
-        app:layout_constraintBottom_toBottomOf="@id/stepsText"
+        app:layout_constraintTop_toBottomOf="@id/stepsText"
         app:layout_constraintStart_toStartOf="parent"
         android:layout_marginTop="20dp"
         android:layout_marginStart="40dp"/>
 
+    <!-- Distance -->
+    <TextView
+        android:id="@+id/distanceText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Distance: 0.00 m"
+        android:textSize="20sp"
+        app:layout_constraintTop_toBottomOf="@id/caloriesText"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="16dp"/>
 
+    <!-- Maintenance Calories -->
+    <TextView
+        android:id="@+id/maintenanceText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Maintenance: 0 kcal"
+        android:textSize="20sp"
+        app:layout_constraintTop_toBottomOf="@id/distanceText"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="16dp"/>
+
+    <!-- XP + Level -->
+    <TextView
+        android:id="@+id/xpText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="XP: 0 | Level: 1"
+        android:textSize="20sp"
+        app:layout_constraintTop_toBottomOf="@id/maintenanceText"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="16dp"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
