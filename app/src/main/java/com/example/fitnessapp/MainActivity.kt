@@ -1,42 +1,42 @@
 package com.example.fitnessapp
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
-    // Step Tracking
+
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
 
     private lateinit var stepsText: TextView
     private lateinit var caloriesText: TextView
+    private lateinit var distanceText: TextView
+    private lateinit var maintenanceText: TextView
+    private lateinit var xpText: TextView
 
-    // Step system
     private var totalSteps = 0f
     private var previousSteps = 0f
 
-    // Distance
-    private lateinit var distanceText: TextView
-    private var strideLength = 0.75 // Metres per step ( can be replaced with user input)
+    private var strideLength = 0.75 // metres per step
 
-    // Maintenance calories
-    private lateinit var maintenanceText: TextView
+    // Maintenance calorie inputs
     private var userAge = 20
     private var userWeight = 70.0
     private var userHeight = 175.0
     private var userActivityLevel = 1.4 // default
 
-    // Level + XP System
-    private lateinit var xpText: TextView
+    // XP + Level
     private var xp = 0
     private var level = 1
 
@@ -51,7 +51,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         xpText = findViewById(R.id.xpText)
 
 
-        // Request permission for physical activity
+        // Button
+        val profileBtn = findViewById<Button>(R.id.openProfileButton)
+        profileBtn.setOnClickListener {
+            startActivity(Intent(this, UserProfileActivity::class.java))
+        }
+
+        // Request activity recognition permission
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACTIVITY_RECOGNITION
@@ -64,7 +70,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             )
         }
 
-        // Sensor Access
+        // Sensor manager
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     }
@@ -87,23 +93,23 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             totalSteps = event.values[0]
             val steps = totalSteps.toInt() - previousSteps.toInt()
 
-            // Step Count
+            // Step count
             stepsText.text = "Steps: $steps"
 
-            // Calories (simple estimate currently)
+            // Calories burned estimate
             val calories = steps * 0.04
             caloriesText.text = "Calories Burned: ${calories.toInt()}"
 
-            // Distance Calculation
+            // Distance walked
             val distance = steps * strideLength
             distanceText.text = "Distance: ${"%.2f".format(distance)} m"
 
-            // Maintenance Calories formula (Mifflin-St Jeor)
+            // Maintenance calories calculation
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
             val maintenance = bmr * userActivityLevel
             maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
 
-            //Level + XP system
+            // XP + Level System
             xp += (steps / 10).toInt()
             if (xp > level * 100) {
                 level++
@@ -112,7 +118,5 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Required method for SensorEventListener, even if empty
-    }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { }
 }
