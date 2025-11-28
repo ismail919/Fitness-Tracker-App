@@ -1,7 +1,6 @@
 package com.example.fitnessapp
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -13,6 +12,8 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.ViewModelProvider
+import androidx.room.Room
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
@@ -25,18 +26,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var maintenanceText: TextView
     private lateinit var xpText: TextView
 
-    private var totalSteps = 0f
-    private var previousSteps = 0f
+    // Room + ViewModel
+    private lateinit var viewModel: UserViewModel
 
-    private var strideLength = 0.75 // metres per step
-
-    // Maintenance calorie inputs
+    // Default values (overwritten if DB has user saved)
     private var userAge = 20
     private var userWeight = 70.0
     private var userHeight = 175.0
-    private var userActivityLevel = 1.4 // default
+    private var userActivityLevel = 1.4
 
-    // XP + Level
+    // XP + Steps
+    private var totalSteps = 0f
+    private var previousSteps = 0f
+    private var strideLength = 0.75
     private var xp = 0
     private var level = 1
 
@@ -44,25 +46,45 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // TEXTVIEWS
         stepsText = findViewById(R.id.stepsText)
         caloriesText = findViewById(R.id.caloriesText)
         distanceText = findViewById(R.id.distanceText)
         maintenanceText = findViewById(R.id.maintenanceText)
         xpText = findViewById(R.id.xpText)
 
-
-        // Button
+        // OPEN PROFILE BUTTON
         val profileBtn = findViewById<Button>(R.id.openProfileButton)
         profileBtn.setOnClickListener {
             startActivity(Intent(this, UserProfileActivity::class.java))
         }
 
-        // Request activity recognition permission
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACTIVITY_RECOGNITION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
+        // ROOM DATABASE SETUP
+        val db = Room.databaseBuilder(
+            applicationContext,
+            AppDatabase::class.java,
+            "user_database"
+        ).build()
+
+        val userDao = db.userDao()
+        val repository = UserRepository(userDao)
+        val factory = UserViewModelFactory(repository)
+        viewModel = ViewModelProvider(this, factory)[UserViewModel::class.java]
+
+        // LOAD SAVED PROFILE
+        viewModel.getUser { user ->
+            if (user != null) {
+                userAge = user.age
+                userWeight = user.weight
+                userHeight = user.height
+                userActivityLevel = user.activityLevel
+            }
+        }
+
+        // PERMISSION
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
+            != PackageManager.PERMISSION_GRANTED) {
+
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
@@ -70,7 +92,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             )
         }
 
-        // Sensor manager
+        // SENSOR
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     }
@@ -93,30 +115,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             totalSteps = event.values[0]
             val steps = totalSteps.toInt() - previousSteps.toInt()
 
-            // Step count
             stepsText.text = "Steps: $steps"
 
-            // Calories burned estimate
             val calories = steps * 0.04
             caloriesText.text = "Calories Burned: ${calories.toInt()}"
 
-            // Distance walked
             val distance = steps * strideLength
-            distanceText.text = "Distance: ${"%.2f".format(distance)} m"
+            distanceText.text = "Distance: %.2f m".format(distance)
 
-            // Maintenance calories calculation
+            // Maintenance calories using saved profile
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
             val maintenance = bmr * userActivityLevel
             maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
 
-            // XP + Level System
             xp += (steps / 10).toInt()
-            if (xp > level * 100) {
-                level++
-            }
+            if (xp > level * 100) level++
             xpText.text = "XP: $xp | Level: $level"
         }
     }
 
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) { }
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 }
