@@ -5,8 +5,8 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
-import androidx.room.Room
 
 class UserProfileActivity : AppCompatActivity() {
 
@@ -16,20 +16,11 @@ class UserProfileActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_profile)
 
-
-        // SETUP ROOM DATABASE + VIEWMODEL
-        val db = Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java,
-            "user_database"
-        ).build()
-
-        val userDao = db.userDao()
-        val repository = UserRepository(userDao)
+        // SINGLETON ROOM DATABASE + VIEWMODEL
+        val db = AppDatabaseSingleton.getDatabase(this)
+        val repository = UserRepository(db.userDao())
         val factory = UserViewModelFactory(repository)
-
         viewModel = ViewModelProvider(this, factory)[UserViewModel::class.java]
-
 
         // FORM INPUTS
         val ageInput = findViewById<EditText>(R.id.inputAge)
@@ -40,12 +31,22 @@ class UserProfileActivity : AppCompatActivity() {
 
         val saveBtn = findViewById<Button>(R.id.saveButton)
         val backBtn = findViewById<Button>(R.id.backButton)
+        
+        // LOAD USER DATA INTO FORM
+        viewModel.getUser { user -> 
+            if (user != null) {
+                runOnUiThread { 
+                    ageInput.setText(user.age.toString())
+                    weightInput.setText(user.weight.toString())
+                    heightInput.setText(user.height.toString())
+                    genderInput.setText(user.gender)
+                    activityInput.setText(user.activityLevel.toString())
+                }
+            }
+        }
 
-
-        //  BACK BUTTON
+        // BACK BUTTON
         backBtn.setOnClickListener { finish() }
-
-
 
         // SAVE BUTTON
         saveBtn.setOnClickListener {
@@ -67,10 +68,8 @@ class UserProfileActivity : AppCompatActivity() {
                     activityLevel = activityLevel
                 )
 
-                // Save into Room DB
                 viewModel.saveUser(user)
 
-                // Go back to main screen
                 startActivity(Intent(this, MainActivity::class.java))
                 finish()
             }

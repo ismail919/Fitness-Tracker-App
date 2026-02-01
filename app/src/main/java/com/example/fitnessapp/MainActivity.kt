@@ -1,6 +1,7 @@
 package com.example.fitnessapp
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -13,7 +14,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
-import androidx.room.Room
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
@@ -26,7 +26,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var maintenanceText: TextView
     private lateinit var xpText: TextView
 
-    // Room + ViewModel
+    // ViewModel
     private lateinit var viewModel: UserViewModel
 
     // Default values (overwritten if DB has user saved)
@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // TEXTVIEWS
+        // TEXT VIEWS
         stepsText = findViewById(R.id.stepsText)
         caloriesText = findViewById(R.id.caloriesText)
         distanceText = findViewById(R.id.distanceText)
@@ -59,27 +59,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             startActivity(Intent(this, UserProfileActivity::class.java))
         }
 
-        // ROOM DATABASE SETUP
-        val db = Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java,
-            "user_database"
-        ).build()
-
-        val userDao = db.userDao()
-        val repository = UserRepository(userDao)
+        // ROOM DATABASE SINGLETON
+        val db = AppDatabaseSingleton.getDatabase(this)
+        val repository = UserRepository(db.userDao())
         val factory = UserViewModelFactory(repository)
         viewModel = ViewModelProvider(this, factory)[UserViewModel::class.java]
-
-        // LOAD SAVED PROFILE
-        viewModel.getUser { user ->
-            if (user != null) {
-                userAge = user.age
-                userWeight = user.weight
-                userHeight = user.height
-                userActivityLevel = user.activityLevel
-            }
-        }
 
         // PERMISSION
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
@@ -99,8 +83,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onResume() {
         super.onResume()
+
         if (stepSensor != null) {
             sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        }
+
+        // Reload user data from Room
+        viewModel.getUser { user ->
+            if (user != null) {
+                userAge = user.age
+                userWeight = user.weight
+                userHeight = user.height
+                userActivityLevel = user.activityLevel
+            }
+
+            // Update maintenance calories immediately
+            val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
+            val maintenance = bmr * userActivityLevel
+
+            runOnUiThread {
+                maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
+            }
         }
     }
 
