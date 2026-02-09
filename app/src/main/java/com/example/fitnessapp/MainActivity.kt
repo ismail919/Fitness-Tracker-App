@@ -32,10 +32,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // ViewModel (EXISTING)
     private lateinit var viewModel: UserViewModel
 
-    // ===================== ADD HERE (1/4) =====================
     // Daily Activity ViewModel
     private lateinit var dailyActivityViewModel: DailyActivityViewModel
-    // ==========================================================
 
     // Default values
     private var userAge = 20
@@ -173,14 +171,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             if (xp > level * 100) level++
             xpText.text = "XP: $xp | Level: $level"
 
-
-            // Persist today's activity
+            // save today's activity
             saveTodayActivity(
                 steps = steps,
                 calories = calories.toInt(),
                 distance = distance
             )
-
         }
     }
 
