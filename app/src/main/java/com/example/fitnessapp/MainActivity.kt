@@ -14,6 +14,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
@@ -26,10 +29,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var maintenanceText: TextView
     private lateinit var xpText: TextView
 
-    // ViewModel
+    // ViewModel (EXISTING)
     private lateinit var viewModel: UserViewModel
 
-    // Default values (overwritten if DB has user saved)
+    // ===================== ADD HERE (1/4) =====================
+    // Daily Activity ViewModel
+    private lateinit var dailyActivityViewModel: DailyActivityViewModel
+    // ==========================================================
+
+    // Default values
     private var userAge = 20
     private var userWeight = 70.0
     private var userHeight = 175.0
@@ -61,14 +69,27 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         // ROOM DATABASE SINGLETON
         val db = AppDatabaseSingleton.getDatabase(this)
+
         val repository = UserRepository(db.userDao())
         val factory = UserViewModelFactory(repository)
         viewModel = ViewModelProvider(this, factory)[UserViewModel::class.java]
 
+        // DailyActivity ViewModel setup
+        val dailyRepository = DailyActivityRepository(db.dailyActivityDao())
+
+        dailyActivityViewModel = ViewModelProvider(
+            this,
+            object : ViewModelProvider.Factory {
+                override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+                    return DailyActivityViewModel(dailyRepository) as T
+                }
+            }
+        )[DailyActivityViewModel::class.java]
+
         // PERMISSION
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
-            != PackageManager.PERMISSION_GRANTED) {
-
+            != PackageManager.PERMISSION_GRANTED
+        ) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACTIVITY_RECOGNITION),
@@ -97,7 +118,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 userActivityLevel = user.activityLevel
             }
 
-            // Update maintenance calories immediately
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
             val maintenance = bmr * userActivityLevel
 
@@ -111,6 +131,25 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onPause()
         sensorManager.unregisterListener(this)
     }
+
+    // Save today's activity into Room
+    private fun saveTodayActivity(steps: Int, calories: Int, distance: Double) {
+
+        val today = SimpleDateFormat(
+            "yyyy-MM-dd",
+            Locale.getDefault()
+        ).format(Date())
+
+        val dailyActivity = DailyActivity(
+            date = today,
+            steps = steps,
+            calories = calories,
+            distance = distance
+        )
+
+        dailyActivityViewModel.saveDailyActivity(dailyActivity)
+    }
+
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event != null) {
@@ -126,7 +165,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             val distance = steps * strideLength
             distanceText.text = "Distance: %.2f m".format(distance)
 
-            // Maintenance calories using saved profile
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
             val maintenance = bmr * userActivityLevel
             maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
@@ -134,6 +172,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             xp += (steps / 10).toInt()
             if (xp > level * 100) level++
             xpText.text = "XP: $xp | Level: $level"
+
+
+            // Persist today's activity
+            saveTodayActivity(
+                steps = steps,
+                calories = calories.toInt(),
+                distance = distance
+            )
+
         }
     }
 
