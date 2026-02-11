@@ -23,6 +23,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private var stepSensor: Sensor? = null
 
+    private lateinit var todayActivity: TextView
     private lateinit var stepsText: TextView
     private lateinit var caloriesText: TextView
     private lateinit var distanceText: TextView
@@ -58,6 +59,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         distanceText = findViewById(R.id.distanceText)
         maintenanceText = findViewById(R.id.maintenanceText)
         xpText = findViewById(R.id.xpText)
+        todayActivity = findViewById(R.id.todayActivityText)
+
 
         // OPEN PROFILE BUTTON
         val profileBtn = findViewById<Button>(R.id.openProfileButton)
@@ -103,11 +106,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onResume() {
         super.onResume()
 
-        if (stepSensor != null) {
-            sensorManager.registerListener(this, stepSensor, SensorManager.SENSOR_DELAY_NORMAL)
+        stepSensor?.let {
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
 
-        // Reload user data from Room
+        // Reload user profile
         viewModel.getUser { user ->
             if (user != null) {
                 userAge = user.age
@@ -117,12 +120,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
 
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
-            val maintenance = bmr * userActivityLevel
-
-            runOnUiThread {
-                maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
-            }
+            maintenanceText.text = "Maintenance: ${(bmr * userActivityLevel).toInt()} kcal"
         }
+
+        // Load today’s saved activity from Room
+        loadTodayActivity()
     }
 
     override fun onPause() {
@@ -148,27 +150,65 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         dailyActivityViewModel.saveDailyActivity(dailyActivity)
     }
 
+    //  Read today's activity from ROOM and show it
+    private fun loadTodayActivity() {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
+        dailyActivityViewModel.getDailyActivity(today) { dailyActivity ->
+            runOnUiThread {
+                todayActivity.text =
+                    if (dailyActivity != null) {
+                        "Today: ${dailyActivity.steps} steps | " +
+                                "${dailyActivity.calories} kcal | " +
+                                String.format("%.2f m", dailyActivity.distance)
+                    } else {
+                        "No activty saved for today"
+                    }
+            }
+        }
+    }
+
+
+    // Called automatically whenever the sensor changes
     override fun onSensorChanged(event: SensorEvent?) {
+
+        // Ensure the sensor event is not null before using it
         if (event != null) {
 
+            // Total number of steps recorded by the step counter since last reboot
             totalSteps = event.values[0]
+
+            // Calculate steps taken during this session
+            val currentSteps = totalSteps.toInt() - previousSteps.toInt()
             val steps = totalSteps.toInt() - previousSteps.toInt()
 
+            // Display the currrnt step count on the UI
             stepsText.text = "Steps: $steps"
 
+            // Estimate calories burned based on steps taken
             val calories = steps * 0.04
             caloriesText.text = "Calories Burned: ${calories.toInt()}"
 
+            // Calculate distance travelled using an estimated stride length
+            val strideLength = 0.75
             val distance = steps * strideLength
             distanceText.text = "Distance: %.2f m".format(distance)
 
+            // Calculate Basal Metabolic Rate (BMR) using the Mifflin-St Jeor equation
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
+
+            // Calculate maintenance calories based on user activity level
             val maintenance = bmr * userActivityLevel
             maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
 
+            // Increase XP based on steps taken
+            previousSteps = totalSteps
             xp += (steps / 10).toInt()
+
+            // Level up if XP reaches a certain threshold
             if (xp > level * 100) level++
+
+            // Update XP and level display
             xpText.text = "XP: $xp | Level: $level"
 
             // save today's activity

@@ -17,6 +17,19 @@
         android:layout_marginTop="40dp"
         android:layout_marginStart="40dp"/>
 
+    <!-- Today's saved activity -->
+    <TextView
+        android:id="@+id/todayActivityText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="No activity saved for today"
+        android:textSize="14sp"
+        android:textColor="#666666"
+        app:layout_constraintTop_toBottomOf="@id/stepsText"
+        app:layout_constraintStart_toStartOf="parent"
+        android:layout_marginTop="12dp"
+        android:layout_marginStart="40dp" />
+
     <!-- Calories -->
     <TextView
         android:id="@+id/caloriesText"
@@ -24,9 +37,9 @@
         android:layout_height="wrap_content"
         android:text="Calories Burned: 0"
         android:textSize="20sp"
-        app:layout_constraintTop_toBottomOf="@id/stepsText"
+        app:layout_constraintTop_toBottomOf="@id/todayActivityText"
         app:layout_constraintStart_toStartOf="parent"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="12dp"
         android:layout_marginStart="40dp"/>
 
     <!-- Distance -->
