@@ -9,6 +9,7 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
 import android.widget.Button
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -29,14 +30,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var distanceText: TextView
     private lateinit var maintenanceText: TextView
     private lateinit var xpText: TextView
+    private lateinit var xpProgressBar: ProgressBar  // NEW
 
-    // ViewModel (EXISTING)
+    // ViewModels
     private lateinit var viewModel: UserViewModel
-
-    // Daily Activity ViewModel
     private lateinit var dailyActivityViewModel: DailyActivityViewModel
 
-    // Default values
+    // Default user values
     private var userAge = 20
     private var userWeight = 70.0
     private var userHeight = 175.0
@@ -45,7 +45,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     // XP + Steps
     private var totalSteps = 0f
     private var previousSteps = 0f
-    private var strideLength = 0.75
     private var xp = 0
     private var level = 1
 
@@ -60,7 +59,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         maintenanceText = findViewById(R.id.maintenanceText)
         xpText = findViewById(R.id.xpText)
         todayActivity = findViewById(R.id.todayActivityText)
-
+        xpProgressBar = findViewById(R.id.xpProgressBar)  // NEW
 
         // OPEN PROFILE BUTTON
         val profileBtn = findViewById<Button>(R.id.openProfileButton)
@@ -77,7 +76,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         // DailyActivity ViewModel setup
         val dailyRepository = DailyActivityRepository(db.dailyActivityDao())
-
         dailyActivityViewModel = ViewModelProvider(
             this,
             object : ViewModelProvider.Factory {
@@ -87,7 +85,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             }
         )[DailyActivityViewModel::class.java]
 
-        // PERMISSION
+        // REQUEST ACTIVITY RECOGNITION PERMISSION
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACTIVITY_RECOGNITION)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -98,7 +96,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             )
         }
 
-        // SENSOR
+        // SENSOR SETUP
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         stepSensor = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
     }
@@ -106,11 +104,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onResume() {
         super.onResume()
 
+        // Register step sensor
         stepSensor?.let {
             sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
 
-        // Reload user profile
+        // Reload user profile from Room and recalculate maintenance calories
         viewModel.getUser { user ->
             if (user != null) {
                 userAge = user.age
@@ -123,7 +122,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             maintenanceText.text = "Maintenance: ${(bmr * userActivityLevel).toInt()} kcal"
         }
 
-        // Load today’s saved activity from Room
+        // Load today's saved activity from Room
         loadTodayActivity()
     }
 
@@ -132,86 +131,75 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager.unregisterListener(this)
     }
 
-    // Save today's activity into Room
+    // Save today's activity to Room
     private fun saveTodayActivity(steps: Int, calories: Int, distance: Double) {
-
-        val today = SimpleDateFormat(
-            "yyyy-MM-dd",
-            Locale.getDefault()
-        ).format(Date())
-
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val dailyActivity = DailyActivity(
             date = today,
             steps = steps,
             calories = calories,
             distance = distance
         )
-
         dailyActivityViewModel.saveDailyActivity(dailyActivity)
     }
 
-    //  Read today's activity from ROOM and show it
+    // Load today's activity from Room and display it
     private fun loadTodayActivity() {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-
         dailyActivityViewModel.getDailyActivity(today) { dailyActivity ->
             runOnUiThread {
-                todayActivity.text =
-                    if (dailyActivity != null) {
-                        "Today: ${dailyActivity.steps} steps | " +
-                                "${dailyActivity.calories} kcal | " +
-                                String.format("%.2f m", dailyActivity.distance)
-                    } else {
-                        "No activty saved for today"
-                    }
+                todayActivity.text = if (dailyActivity != null) {
+                    "Today: ${dailyActivity.steps} steps | " +
+                            "${dailyActivity.calories} kcal | " +
+                            String.format("%.2f m", dailyActivity.distance)
+                } else {
+                    "No activity saved for today"
+                }
             }
         }
     }
 
-
-    // Called automatically whenever the sensor changes
+    // Called automatically when the step sensor registers a change
     override fun onSensorChanged(event: SensorEvent?) {
-
-        // Ensure the sensor event is not null before using it
         if (event != null) {
 
-            // Total number of steps recorded by the step counter since last reboot
+            // Total steps since last device reboot
             totalSteps = event.values[0]
 
-            // Calculate steps taken during this session
-            val currentSteps = totalSteps.toInt() - previousSteps.toInt()
+            // Steps taken this session
             val steps = totalSteps.toInt() - previousSteps.toInt()
 
-            // Display the currrnt step count on the UI
+            // Update step display
             stepsText.text = "Steps: $steps"
 
-            // Estimate calories burned based on steps taken
+            // Calculate and display calories burned
             val calories = steps * 0.04
             caloriesText.text = "Calories Burned: ${calories.toInt()}"
 
-            // Calculate distance travelled using an estimated stride length
+            // Calculate and display distance
             val strideLength = 0.75
             val distance = steps * strideLength
             distanceText.text = "Distance: %.2f m".format(distance)
 
-            // Calculate Basal Metabolic Rate (BMR) using the Mifflin-St Jeor equation
+            // Recalculate and display maintenance calories (Mifflin-St Jeor)
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
-
-            // Calculate maintenance calories based on user activity level
             val maintenance = bmr * userActivityLevel
             maintenanceText.text = "Maintenance: ${maintenance.toInt()} kcal"
 
-            // Increase XP based on steps taken
+            // Update XP and level
             previousSteps = totalSteps
             xp += (steps / 10).toInt()
-
-            // Level up if XP reaches a certain threshold
             if (xp > level * 100) level++
 
-            // Update XP and level display
+            // Update XP text display
             xpText.text = "XP: $xp | Level: $level"
 
-            // save today's activity
+            // Update XP progress bar (progress within current level as percentage)
+            val xpForCurrentLevel = xp % (level * 100)
+            val progressPercent = ((xpForCurrentLevel.toFloat() / (level * 100)) * 100).toInt()
+            xpProgressBar.progress = progressPercent  // NEW
+
+            // Save today's activity to Room
             saveTodayActivity(
                 steps = steps,
                 calories = calories.toInt(),
