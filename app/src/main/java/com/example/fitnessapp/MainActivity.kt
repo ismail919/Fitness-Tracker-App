@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             val steps = totalSteps.toInt() - previousSteps.toInt()
 
             // Update step display
-            stepsText.text = "Steps: $steps"
+            stepsText.text = "$steps"
 
             // Calculate and display calories burned
             val calories = steps * 0.04
