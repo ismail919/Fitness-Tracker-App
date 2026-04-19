@@ -96,7 +96,7 @@
                     android:id="@+id/stepsText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Steps: 0"
+                    android:text="0"
                     android:textColor="#FFFFFF"
                     android:textSize="64sp"
                     android:textStyle="bold"
