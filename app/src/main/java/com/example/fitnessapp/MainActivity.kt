@@ -32,6 +32,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var xpText: TextView
     private lateinit var xpProgressBar: ProgressBar  // NEW
 
+    // NEW UI ELEMENTS (added for gamification)
+    private lateinit var stepGoalText: TextView
+    private lateinit var stepGoalProgressBar: ProgressBar
+    private lateinit var nextLevelText: TextView
+    private lateinit var badgeText: TextView
+
     // ViewModels
     private lateinit var viewModel: UserViewModel
     private lateinit var dailyActivityViewModel: DailyActivityViewModel
@@ -48,6 +54,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var xp = 0
     private var level = 1
 
+    // NEW: Daily goal
+    private val dailyStepGoal = 8000
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -60,6 +69,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         xpText = findViewById(R.id.xpText)
         todayActivity = findViewById(R.id.todayActivityText)
         xpProgressBar = findViewById(R.id.xpProgressBar)  // NEW
+
+        // NEW: link gamification UI
+        stepGoalText = findViewById(R.id.stepGoalText)
+        stepGoalProgressBar = findViewById(R.id.stepGoalProgressBar)
+        nextLevelText = findViewById(R.id.nextLevelText)
+        badgeText = findViewById(R.id.badgeText)
 
         // OPEN PROFILE BUTTON
         val profileBtn = findViewById<Button>(R.id.openProfileButton)
@@ -148,12 +163,26 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         dailyActivityViewModel.getDailyActivity(today) { dailyActivity ->
             runOnUiThread {
-                todayActivity.text = if (dailyActivity != null) {
-                    "Today: ${dailyActivity.steps} steps | " +
+                if (dailyActivity != null) {
+                    todayActivity.text = "Today: ${dailyActivity.steps} steps | " +
                             "${dailyActivity.calories} kcal | " +
                             String.format("%.2f m", dailyActivity.distance)
+
+                    stepsText.text = "${dailyActivity.steps}"
+                    caloriesText.text = "${dailyActivity.calories} kcal"
+                    distanceText.text = "%.2f m".format(dailyActivity.distance)
+
+                    val stepGoalProgress =
+                        ((dailyActivity.steps.toFloat() / dailyStepGoal) * 100).toInt().coerceAtMost(100)
+                    stepGoalText.text = "Goal: ${dailyActivity.steps} / $dailyStepGoal"
+                    stepGoalProgressBar.progress = stepGoalProgress
                 } else {
-                    "No activity saved for today"
+                    todayActivity.text = "No activity saved for today"
+                    stepsText.text = "0"
+                    caloriesText.text = "0 kcal"
+                    distanceText.text = "0.00 m"
+                    stepGoalText.text = "Goal: 0 / $dailyStepGoal"
+                    stepGoalProgressBar.progress = 0
                 }
             }
         }
@@ -172,14 +201,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             // Update step display
             stepsText.text = "$steps"
 
+            // NEW: Update daily goal progress
+            val stepGoalProgress = ((steps.toFloat() / dailyStepGoal) * 100).toInt().coerceAtMost(100)
+            stepGoalText.text = "Goal: $steps / $dailyStepGoal"
+            stepGoalProgressBar.progress = stepGoalProgress
+
             // Calculate and display calories burned
             val calories = steps * 0.04
-            caloriesText.text = "Calories Burned: ${calories.toInt()}"
+            caloriesText.text = "${calories.toInt()} kcal"
 
             // Calculate and display distance
             val strideLength = 0.75
             val distance = steps * strideLength
-            distanceText.text = "Distance: %.2f m".format(distance)
+            distanceText.text = "%.2f m".format(distance)
 
             // Recalculate and display maintenance calories (Mifflin-St Jeor)
             val bmr = (10 * userWeight) + (6.25 * userHeight) - (5 * userAge) + 5
@@ -189,15 +223,33 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             // Update XP and level
             previousSteps = totalSteps
             xp += (steps / 10).toInt()
-            if (xp > level * 100) level++
+            if (xp >= level * 100) level++
 
             // Update XP text display
             xpText.text = "XP: $xp | Level: $level"
 
-            // Update XP progress bar (progress within current level as percentage)
-            val xpForCurrentLevel = xp % (level * 100)
-            val progressPercent = ((xpForCurrentLevel.toFloat() / (level * 100)) * 100).toInt()
+            // Improved XP progress calculation
+            val previousLevelThreshold = (level - 1) * 100
+            val currentLevelThreshold = level * 100
+            val xpForCurrentLevel = xp - previousLevelThreshold
+            val xpNeededForLevel = currentLevelThreshold - previousLevelThreshold
+            val progressPercent = ((xpForCurrentLevel.toFloat() / xpNeededForLevel) * 100)
+                .toInt().coerceIn(0, 100)
+
             xpProgressBar.progress = progressPercent  // NEW
+
+            // NEW: Next level text
+            val xpNeeded = currentLevelThreshold - xp
+            nextLevelText.text = "$xpNeeded XP to next level"
+
+            // NEW: Badge system
+            badgeText.text = when {
+                steps >= 10000 -> "Badge: Goal Crusher"
+                steps >= 8000 -> "Badge: Daily Goal Achieved"
+                steps >= 5000 -> "Badge: Active Day"
+                steps >= 1000 -> "Badge: Getting Started"
+                else -> "Badge: No badge yet"
+            }
 
             // Save today's activity to Room
             saveTodayActivity(
