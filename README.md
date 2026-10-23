@@ -37,7 +37,6 @@ Step counting works best on a real phone. On the emulator you can fake sensor da
 
 ## Still to do
 
-- Fix the maintenance calorie calculation
 - Unit tests
 - GitHub Actions to build and test on every push
 - Charts for activity history
