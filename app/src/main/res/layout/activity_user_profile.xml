@@ -73,17 +73,12 @@
             android:padding="12dp" />
 
         <!-- Activity Level -->
-        <EditText
+        <Spinner
             android:id="@+id/inputActivity"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Activity Level (1.2 - 1.9)"
-            android:inputType="numberDecimal"
+            android:layout_height="56dp"
             android:layout_marginTop="10dp"
-            android:textColor="#C8F04A"
-            android:textColorHint="#888888"
-            android:backgroundTint="#C8F04A"
-            android:padding="12dp" />
+            android:backgroundTint="#C8F04A" />
 
         <!-- Save Button -->
         <Button
