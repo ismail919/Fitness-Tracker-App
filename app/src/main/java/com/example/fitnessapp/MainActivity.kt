@@ -8,9 +8,13 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.EditText
 import android.widget.ProgressBar
+import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -39,6 +43,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var strainText: TextView
     private lateinit var strainProgressBar: ProgressBar
+
+    private lateinit var recoveryText: TextView
+    private lateinit var recoveryProgressBar: ProgressBar
+    private lateinit var recoveryHint: TextView
+    private lateinit var sleepInput: EditText
+    private lateinit var feelingSpinner: Spinner
+    private lateinit var saveCheckInButton: Button
+
+    private val feelingLabels = listOf(
+        "1 - Terrible",
+        "2 - Poor",
+        "3 - Okay",
+        "4 - Good",
+        "5 - Great"
+    )
 
     // ViewModels
     private lateinit var viewModel: UserViewModel
@@ -78,6 +97,35 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         strainText = findViewById(R.id.strainText)
         strainProgressBar = findViewById(R.id.strainProgressBar)
+
+        recoveryText = findViewById(R.id.recoveryText)
+        recoveryProgressBar = findViewById(R.id.recoveryProgressBar)
+        recoveryHint = findViewById(R.id.recoveryHint)
+        sleepInput = findViewById(R.id.sleepInput)
+        feelingSpinner = findViewById(R.id.feelingSpinner)
+        saveCheckInButton = findViewById(R.id.saveCheckInButton)
+
+        // FEELING DROPDOWN
+        val feelingAdapter = ArrayAdapter(this, R.layout.spinner_item, feelingLabels)
+        feelingAdapter.setDropDownViewResource(R.layout.spinner_item)
+        feelingSpinner.adapter = feelingAdapter
+        feelingSpinner.setSelection(2)
+
+        // SAVE CHECK-IN BUTTON
+        saveCheckInButton.setOnClickListener {
+            val sleep = sleepInput.text.toString().toDoubleOrNull()
+            if (sleep == null || sleep < 0 || sleep > 24) {
+                Toast.makeText(this, "Enter hours slept, between 0 and 24", Toast.LENGTH_SHORT).show()
+            } else {
+                val feeling = feelingSpinner.selectedItemPosition + 1
+                getSharedPreferences("checkin", MODE_PRIVATE).edit()
+                    .putString("date", todayString())
+                    .putFloat("sleep", sleep.toFloat())
+                    .putInt("feeling", feeling)
+                    .apply()
+                showRecovery(sleep, feeling)
+            }
+        }
 
         // OPEN PROFILE BUTTON
         val profileBtn = findViewById<Button>(R.id.openProfileButton)
@@ -142,11 +190,18 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         // Load today's saved activity from Room
         loadTodayActivity()
+
+        // Load today's check-in, if there is one
+        loadCheckIn()
     }
 
     override fun onPause() {
         super.onPause()
         sensorManager.unregisterListener(this)
+    }
+
+    private fun todayString(): String {
+        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
     }
 
     // Shows the strain score for a given number of steps
@@ -156,11 +211,34 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         strainProgressBar.progress = strain
     }
 
+    // Shows the recovery score for a sleep + feeling check-in
+    private fun showRecovery(sleepHours: Double, feeling: Int) {
+        val recovery = Scores.recovery(sleepHours, feeling)
+        recoveryText.text = "$recovery / 100"
+        recoveryProgressBar.progress = recovery
+        recoveryHint.text = "Based on $sleepHours h sleep and feeling ${feelingLabels[feeling - 1].substring(4).lowercase()}"
+    }
+
+    // Loads today's check-in from storage, if it was saved today
+    private fun loadCheckIn() {
+        val prefs = getSharedPreferences("checkin", MODE_PRIVATE)
+        if (prefs.getString("date", "") == todayString()) {
+            val sleep = prefs.getFloat("sleep", 0f).toDouble()
+            val feeling = prefs.getInt("feeling", 3)
+            sleepInput.setText(sleep.toString())
+            feelingSpinner.setSelection(feeling - 1)
+            showRecovery(sleep, feeling)
+        } else {
+            recoveryText.text = "-- / 100"
+            recoveryProgressBar.progress = 0
+            recoveryHint.text = "Do your check-in below to get today's score"
+        }
+    }
+
     // Save today's activity to Room
     private fun saveTodayActivity(steps: Int, calories: Int, distance: Double) {
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         val dailyActivity = DailyActivity(
-            date = today,
+            date = todayString(),
             steps = steps,
             calories = calories,
             distance = distance
@@ -170,8 +248,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     // Load today's activity from Room and display it
     private fun loadTodayActivity() {
-        val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        dailyActivityViewModel.getDailyActivity(today) { dailyActivity ->
+        dailyActivityViewModel.getDailyActivity(todayString()) { dailyActivity ->
             runOnUiThread {
                 if (dailyActivity != null) {
                     todayActivity.text = "Today: ${dailyActivity.steps} steps | " +
