@@ -30,13 +30,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var distanceText: TextView
     private lateinit var maintenanceText: TextView
     private lateinit var xpText: TextView
-    private lateinit var xpProgressBar: ProgressBar  // NEW
+    private lateinit var xpProgressBar: ProgressBar
 
-    // NEW UI ELEMENTS (added for gamification)
     private lateinit var stepGoalText: TextView
     private lateinit var stepGoalProgressBar: ProgressBar
     private lateinit var nextLevelText: TextView
     private lateinit var badgeText: TextView
+
+    private lateinit var strainText: TextView
+    private lateinit var strainProgressBar: ProgressBar
 
     // ViewModels
     private lateinit var viewModel: UserViewModel
@@ -54,7 +56,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var xp = 0
     private var level = 1
 
-    // NEW: Daily goal
     private val dailyStepGoal = 8000
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,13 +69,15 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         maintenanceText = findViewById(R.id.maintenanceText)
         xpText = findViewById(R.id.xpText)
         todayActivity = findViewById(R.id.todayActivityText)
-        xpProgressBar = findViewById(R.id.xpProgressBar)  // NEW
+        xpProgressBar = findViewById(R.id.xpProgressBar)
 
-        // NEW: link gamification UI
         stepGoalText = findViewById(R.id.stepGoalText)
         stepGoalProgressBar = findViewById(R.id.stepGoalProgressBar)
         nextLevelText = findViewById(R.id.nextLevelText)
         badgeText = findViewById(R.id.badgeText)
+
+        strainText = findViewById(R.id.strainText)
+        strainProgressBar = findViewById(R.id.strainProgressBar)
 
         // OPEN PROFILE BUTTON
         val profileBtn = findViewById<Button>(R.id.openProfileButton)
@@ -146,6 +149,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         sensorManager.unregisterListener(this)
     }
 
+    // Shows the strain score for a given number of steps
+    private fun showStrain(steps: Int) {
+        val strain = Scores.strain(steps, dailyStepGoal)
+        strainText.text = "$strain / 100"
+        strainProgressBar.progress = strain
+    }
+
     // Save today's activity to Room
     private fun saveTodayActivity(steps: Int, calories: Int, distance: Double) {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
@@ -176,6 +186,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         ((dailyActivity.steps.toFloat() / dailyStepGoal) * 100).toInt().coerceAtMost(100)
                     stepGoalText.text = "Goal: ${dailyActivity.steps} / $dailyStepGoal"
                     stepGoalProgressBar.progress = stepGoalProgress
+
+                    showStrain(dailyActivity.steps)
                 } else {
                     todayActivity.text = "No activity saved for today"
                     stepsText.text = "0"
@@ -183,6 +195,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                     distanceText.text = "0.00 m"
                     stepGoalText.text = "Goal: 0 / $dailyStepGoal"
                     stepGoalProgressBar.progress = 0
+
+                    showStrain(0)
                 }
             }
         }
@@ -201,10 +215,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             // Update step display
             stepsText.text = "$steps"
 
-            // NEW: Update daily goal progress
+            // Update daily goal progress
             val stepGoalProgress = ((steps.toFloat() / dailyStepGoal) * 100).toInt().coerceAtMost(100)
             stepGoalText.text = "Goal: $steps / $dailyStepGoal"
             stepGoalProgressBar.progress = stepGoalProgress
+
+            // Update strain score
+            showStrain(steps)
 
             // Calculate and display calories burned
             val calories = steps * 0.04
@@ -228,7 +245,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             // Update XP text display
             xpText.text = "XP: $xp | Level: $level"
 
-            // Improved XP progress calculation
+            // XP progress calculation
             val previousLevelThreshold = (level - 1) * 100
             val currentLevelThreshold = level * 100
             val xpForCurrentLevel = xp - previousLevelThreshold
@@ -236,13 +253,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             val progressPercent = ((xpForCurrentLevel.toFloat() / xpNeededForLevel) * 100)
                 .toInt().coerceIn(0, 100)
 
-            xpProgressBar.progress = progressPercent  // NEW
+            xpProgressBar.progress = progressPercent
 
-            // NEW: Next level text
+            // Next level text
             val xpNeeded = currentLevelThreshold - xp
             nextLevelText.text = "$xpNeeded XP to next level"
 
-            // NEW: Badge system
+            // Badge system
             badgeText.text = when {
                 steps >= 10000 -> "Badge: Goal Crusher"
                 steps >= 8000 -> "Badge: Daily Goal Achieved"
